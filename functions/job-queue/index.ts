@@ -1,0 +1,113 @@
+import { APIGatewayProxyEvent } from 'aws-lambda';
+import * as AWS from 'aws-sdk';
+import moment from 'moment';
+
+declare type ResponseBody = {
+    [name: string]: any
+}
+
+declare type JobStatus = 'Accepted' | 'Processing' | 'Ready' | 'Error';
+
+declare type Job = {
+    url: string
+    status: JobStatus
+    response?: string //will be stored in DynamoDB as a string, of some encoding
+    updatedAt: string
+    createdAt: string
+};
+
+function buildResponse(statusCode: number, body: ResponseBody | null) {
+    const _body = body ? JSON.stringify(body) : JSON.stringify({});
+    
+    return {
+        statusCode,
+        body: _body,
+    }
+};
+
+const docClient = new AWS.DynamoDB.DocumentClient({region: 'us-east-1'});
+const sqs = new AWS.SQS({region: 'us-east-1'});
+
+async function startJob(job: Job) {
+    const params : AWS.SQS.SendMessageRequest = {
+        MessageBody: JSON.stringify(job),
+        QueueUrl: ''
+    }
+
+    return sqs.sendMessage(params).promise();
+};
+
+const ApplicationConstants = {
+    tableName: 'active-jobs',
+}
+
+exports.handler = async (event : APIGatewayProxyEvent) => {
+    console.log('event: ', JSON.stringify(event));
+    const { body, path, httpMethod } = event;
+    
+    const resourceId = path.slice(1);
+
+    console.log(`resourceId: ${resourceId}`);
+
+    //handle retrieving the results, or return 202 Accepted or 404 Not Found
+    if(httpMethod === 'GET') {
+        //lookup in DynamoDB
+        const { Item } = await docClient.get({
+            TableName: ApplicationConstants.tableName,
+            Key: {
+                url: resourceId
+            }
+        }).promise();
+
+        //if job.status === Ready, then return job.response 
+        if(Item) {
+            return buildResponse(404, Item.response);
+        } else {
+            return buildResponse(404, { errorMessage: 'resource not found'});
+        }
+    } else if(httpMethod === 'POST') {
+        const now = moment();
+        const newJob: Job = {
+            url: resourceId,
+            status: 'Accepted',
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+        }
+
+        //lookup in DynamoDB
+        const { Item } = await docClient.get({
+            TableName: ApplicationConstants.tableName,
+            Key: {
+                url: resourceId
+            }
+        }).promise();
+
+        //if it exists, check if it has been requested in the last hour
+        if(Item) {
+            const job = Item as Job;
+            const { status, createdAt } = job;
+            const created = moment(createdAt);
+            const expired = moment(createdAt).add(1, 'h');
+
+            if(now.isBetween(created, expired)) {
+                return buildResponse(200, { message: 'Request created within the last hour (skipped fetch)'});
+            }
+
+            if(status === 'Processing') {
+                return buildResponse(202, { message: 'still processing. Grab some coffee!' });
+            }
+        } 
+
+        await docClient.put({ 
+            TableName: ApplicationConstants.tableName, 
+            Item: newJob 
+        }).promise();
+
+        //send to SQS
+        await startJob(newJob);
+
+        return buildResponse(202, { message: 'Accepted'});
+    } else {
+        return buildResponse(400, { errorMessage: 'this endpoint only accepts GET and POST'});
+    };
+};
