@@ -43,11 +43,13 @@ const ApplicationConstants = {
 
 exports.handler = async (event : APIGatewayProxyEvent) => {
     console.log('event: ', JSON.stringify(event));
-    const { body, path, httpMethod } = event;
-    
-    const resourceId = path.slice(1);
+    const { body, path, httpMethod, queryStringParameters } = event;
 
-    console.log(`resourceId: ${resourceId}`);
+    if(!queryStringParameters || !queryStringParameters.url) {
+        return buildResponse(400, { errorMessage: 'malformed request, please send the URL to fetch as an encoded query parameter: url=myurl.com'})
+    }
+
+    const { url } = queryStringParameters;
 
     //handle retrieving the results, or return 202 Accepted or 404 Not Found
     if(httpMethod === 'GET') {
@@ -55,7 +57,7 @@ exports.handler = async (event : APIGatewayProxyEvent) => {
         const { Item } = await docClient.get({
             TableName: ApplicationConstants.tableName,
             Key: {
-                url: resourceId
+                url
             }
         }).promise();
 
@@ -68,7 +70,7 @@ exports.handler = async (event : APIGatewayProxyEvent) => {
     } else if(httpMethod === 'POST') {
         const now = moment();
         const newJob: Job = {
-            url: resourceId,
+            url,
             status: 'Accepted',
             createdAt: now.toISOString(),
             updatedAt: now.toISOString(),
@@ -78,7 +80,7 @@ exports.handler = async (event : APIGatewayProxyEvent) => {
         const { Item } = await docClient.get({
             TableName: ApplicationConstants.tableName,
             Key: {
-                url: resourceId
+                url
             }
         }).promise();
 
