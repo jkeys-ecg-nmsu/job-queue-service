@@ -17,7 +17,7 @@ const sqs = new AWS.SQS({region: 'us-east-1'});
 async function startJob(job: Job) {
     const params : AWS.SQS.SendMessageRequest = {
         MessageBody: JSON.stringify(job),
-        QueueUrl: ''
+        QueueUrl: 'https://sqs.us-east-1.amazonaws.com/888601200923/JobQueueServiceStack-activefetchjobsE85F2D4D-14ZZHODKVJTS7'
     }
 
     return sqs.sendMessage(params).promise();
