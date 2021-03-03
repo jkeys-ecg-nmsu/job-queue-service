@@ -39,7 +39,6 @@ export class JobQueueServiceStack extends cdk.Stack {
       handler: apiHandler
     });
 
-
     //and the table that will store the status of jobs
     const table = new dynamodb.Table(this, 'active-jobs', {
       partitionKey: {
@@ -48,5 +47,8 @@ export class JobQueueServiceStack extends cdk.Stack {
       },
       tableName: 'active-jobs'
     });
+
+    table.grantReadWriteData(sqsConsumer);
+    table.grantReadWriteData(apiHandler);
   }
 }
