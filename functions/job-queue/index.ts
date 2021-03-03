@@ -2,20 +2,6 @@ import { APIGatewayProxyEvent } from 'aws-lambda';
 import * as AWS from 'aws-sdk';
 import moment from 'moment';
 
-declare type ResponseBody = {
-    [name: string]: any
-}
-
-declare type JobStatus = 'Accepted' | 'Processing' | 'Ready' | 'Error';
-
-declare type Job = {
-    url: string
-    status: JobStatus
-    response?: string //will be stored in DynamoDB as a string, of some encoding
-    updatedAt: string
-    createdAt: string
-};
-
 function buildResponse(statusCode: number, body: ResponseBody | null) {
     const _body = body ? JSON.stringify(body) : JSON.stringify({});
     

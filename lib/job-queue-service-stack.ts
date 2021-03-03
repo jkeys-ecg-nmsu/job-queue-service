@@ -3,6 +3,8 @@ import * as dynamodb from "@aws-cdk/aws-dynamodb";
 import * as sqs from '@aws-cdk/aws-sqs';
 import * as apigateway from "@aws-cdk/aws-apigateway";
 import * as lambda from "@aws-cdk/aws-lambda";
+import { SqsEventSource } from '@aws-cdk/aws-lambda-event-sources';
+
 
 export class JobQueueServiceStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -11,12 +13,24 @@ export class JobQueueServiceStack extends cdk.Stack {
     //create the SQS that the acceptor will access
     const queue = new sqs.Queue(this, "active-fetch-jobs");
 
-    //create the lambda
+    //create the REST API handler lambda
     const apiHandler = new lambda.Function(this, 'job-handler', {
       handler: 'index.handler',
       runtime: lambda.Runtime.NODEJS_12_X,
       code: lambda.Code.fromAsset('functions/job-queue')
     });
+
+    //create the consumer lambda
+    const sqsConsumer = new lambda.Function(this, 'job-consumer', {
+      handler: 'index.handler',
+      runtime: lambda.Runtime.NODEJS_12_X,
+      code: lambda.Code.fromAsset('functions/job-consumer')
+    });
+
+    //attach the SQS consumer lambda to the queue
+    sqsConsumer.addEventSource(new SqsEventSource(queue, { 
+      batchSize: 1 //batchSize of 1 for initial testing and low expected load 
+    }))
 
     //create the API Gateway that will front the service
     const api = new apigateway.LambdaRestApi(this, 'fetch-jobs', {
@@ -25,8 +39,6 @@ export class JobQueueServiceStack extends cdk.Stack {
       handler: apiHandler
     });
 
-    //create the resource for the path, e.g. POST base-url.com/{id} 
-    const jobIdResource = api.root.addResource("{id}");
 
     //and the table that will store the status of jobs
     const table = new dynamodb.Table(this, 'active-jobs', {
