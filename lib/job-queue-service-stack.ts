@@ -12,7 +12,7 @@ export class JobQueueServiceStack extends cdk.Stack {
     const queue = new sqs.Queue(this, "active-fetch-jobs");
 
     //create the lambda
-    const handler = new lambda.Function(this, 'job-handler', {
+    const apiHandler = new lambda.Function(this, 'job-handler', {
       handler: 'index.handler',
       runtime: lambda.Runtime.NODEJS_12_X,
       code: lambda.Code.fromAsset('functions/job-queue')
@@ -22,7 +22,7 @@ export class JobQueueServiceStack extends cdk.Stack {
     const api = new apigateway.LambdaRestApi(this, 'fetch-jobs', {
       restApiName: 'Job Service',
       description: 'asynchronously accept jobs and retrieve the results',
-      handler
+      handler: apiHandler
     });
 
     //create the resource for the path, e.g. POST base-url.com/{id} 
