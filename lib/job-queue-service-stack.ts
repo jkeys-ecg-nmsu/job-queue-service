@@ -50,5 +50,7 @@ export class JobQueueServiceStack extends cdk.Stack {
 
     table.grantReadWriteData(sqsConsumer);
     table.grantReadWriteData(apiHandler);
+
+    queue.grantSendMessages(apiHandler);
   }
 }
