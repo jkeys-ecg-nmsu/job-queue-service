@@ -53,7 +53,7 @@ exports.handler = async (event : APIGatewayProxyEvent) => {
                 if(Item.status === 'Ready') {
                     return buildResponse(404, Item.response);
                 } else {
-                    return buildResponse(200, { message: 'Processing'})
+                    return buildResponse(202, { message: 'Processing'})
                 }
             } else {
                 return buildResponse(404, { errorMessage: 'resource not found'});
